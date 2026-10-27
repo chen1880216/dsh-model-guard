@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Disabled Models",
+    "description": "Disable models from Settings: a disabled model is hidden from the conversation model picker and cannot be selected or submitted."
+  }
+}

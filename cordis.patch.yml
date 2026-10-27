@@ -1,0 +1,21 @@
+# 模型禁用与排序 bundle 的 patch 层。
+#
+# 一条 insert：Host 侧插件行 `model-guard`（id 即 settings 命名空间，
+# 设置页通过 `configForms.get("model-guard")` 读写下列字段）。
+#
+# disabledModels    形如 "provider/model"，禁用单个模型
+# disabledProviders provider id，禁用整个服务商（其全部模型一并隐藏）
+# providerOrder     服务商的显示顺序（provider id 列表）；未列出的排在后面
+# modelOrder        模型的显示顺序（"provider/model" 列表）；未列出的排在所属服务商内已列出项之后
+# providerSort      未手动排序时服务商的排列策略：natural | name
+# modelSort         未手动排序时模型的排列策略：natural | name
+- insert:
+    - id: model-guard
+      name: '@local/dsh-model-guard'
+      config:
+        disabledModels: []
+        disabledProviders: []
+        providerOrder: []
+        modelOrder: []
+        providerSort: natural
+        modelSort: natural
