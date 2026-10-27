@@ -4,6 +4,8 @@ DSH（DeepSeek Harness）插件：**禁用模型 / 服务商**，并**自定义�
 
 被禁用的模型或服务商不会出现在对话的模型选择器里，也无法被选中或提交；排序决定选择器里服务商的先后，以及每个服务商内部模型的先后。
 
+本开源项目已链接并认可 [LINUX DO](https://linux.do) 社区。
+
 ## 功能
 
 - **禁用单个模型**：勾掉后它从模型选择器消失，且 Host 侧拒绝选中/提交该模型。
@@ -86,4 +88,4 @@ dsh plugin --profile web add /path/to/dsh-model-guard
 
 ## 许可
 
-MIT
+本项目采用 [MIT License](LICENSE) 开源。
