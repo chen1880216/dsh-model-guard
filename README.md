@@ -22,7 +22,7 @@ DSH（DeepSeek Harness）插件：**禁用模型 / 服务商**，并**自定义�
   - 规则恒为 **显式顺序 > 回退策略 > 原顺序**，未列出的新模型自动排在后面，模型增减无需重写配置。
 - **对话模型菜单默认收起**：输入框的模型菜单里，服务商分组默认收起，点击服务商名称展开；搜索或键盘操作会自动展开。
 - **优先模型（★）**：把模型标记为优先后，它始终排在其服务商的最前面，不受「置顶 / 上移 / 下移」影响；多个优先模型按标记顺序排列。
-- **可用性测试**：设置页每行有「测试」、工具栏有「测试全部」，向模型发一条极小的 ping 请求，显示 **可用 / 不可用 + 延迟(ms)**；失败时鼠标悬停可看具体原因（如鉴权失败、限流、模型不存在）。结果只活在当前页面，刷新即清空。测试会消耗个位数 token。
+- **可用性测试**：设置页每行有「测试」、工具栏有「测试全部」，向模型发一条极小的 ping 请求，显示 **可用 / 不可用 + 延迟(ms)**；失败时鼠标悬停可看具体原因（如鉴权失败、限流、模型不存在）。结果存在 localStorage（键 `model-guard:probe-results:v1`，保留 7 天），刷新页面、开新标签页都还在，不必为了看一眼再测一次；每行悬停可看「测得于 HH:MM」。测试会消耗个位数 token。
 - **选择器里直接看结果**：对话输入框的模型菜单不提供测试按钮，只把设置页测出来的可用性与延迟显示在模型名右侧。
 - **分组级测试与并发/超时**：每个服务商的标题右侧有「测试本组」，一次测完该服务商全部模型，并在标题上显示「可用/已测」小计；排序栏可调**探测并发（1–8）**与**探测超时（5/10/20/30 s，默认 10 s）**。
 - **设置默认模型**：设置页顶部「默认模型」下拉按服务商分组列出可选模型，点「设为默认」即写入 profile 的 `agent-default-model` 条目——新会话默认用它，重启后仍生效（走 Host 的 `agentDefaultModel.saveSelection()`，不是另存一份影子配置）。
@@ -166,7 +166,7 @@ This open-source project is linked to and endorses the [LINUX DO](https://linux.
   - The rule is always **explicit order > fallback strategy > original order**, so newly added models land at the end automatically — no need to rewrite the config when models come and go.
 - **Chat model menu starts collapsed**: in the composer's model menu, provider groups are collapsed by default — click a provider name to expand it; searching or using the keyboard expands everything.
 - **Priority models (★)**: mark a model as priority and it always sorts first inside its provider, regardless of move-to-top/up/down; multiple priority models keep the order you marked them.
-- **Availability probe**: each row has **Test** and the toolbar has **Test all**. A probe sends one tiny ping to the model and reports **available / unavailable plus latency (ms)**; hover a failure to see the reason (auth, rate limit, unknown model). Results live only in the current page session. A probe costs a handful of tokens.
+- **Availability probe**: each row has **Test** and the toolbar has **Test all**. A probe sends one tiny ping to the model and reports **available / unavailable plus latency (ms)**; hover a failure to see the reason (auth, rate limit, unknown model). Results persist in localStorage (key `model-guard:probe-results:v1`, kept for 7 days), so a refresh or a new tab still shows them — no need to re-probe just to look. Hover a row to see "tested at HH:MM". A probe costs a handful of tokens.
 - **Results inside the picker**: the composer's model menu has no test button; it only shows the availability and latency measured on the settings page, next to each model name.
 - **Per-provider testing plus tunable concurrency/timeout**: each provider header has **Test group** (probes every model of that provider and shows an `ok/tested` tally next to the title); the sort bar exposes **probe concurrency (1–8)** and **probe timeout (5/10/20/30 s, default 10 s)**.
 - **Default model**: the **Default model** dropdown at the top of the page groups models by provider; **Set as default** writes the profile's `agent-default-model` entry through the Host's `agentDefaultModel.saveSelection()`, so new sessions use it and it survives restarts — no shadow copy in this plugin.
