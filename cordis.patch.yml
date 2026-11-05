@@ -19,3 +19,4 @@
         modelOrder: []
         providerSort: natural
         modelSort: natural
+        collapsePickerGroups: true

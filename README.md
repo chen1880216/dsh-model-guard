@@ -20,6 +20,7 @@ DSH（DeepSeek Harness）插件：**禁用模型 / 服务商**，并**自定义�
   - 手工顺序：每个服务商、每个模型都有「置顶 / 上移 / 下移」。
   - 自动顺序：可选「按名称」排列未被手工调整过的项。
   - 规则恒为 **显式顺序 > 回退策略 > 原顺序**，未列出的新模型自动排在后面，模型增减无需重写配置。
+- **对话模型菜单默认收起**：输入框的模型菜单里，服务商分组默认收起，点击服务商名称展开；搜索或键盘操作会自动展开。
 - 全部设置改完**即时生效**，不需要重启 DSH。
 
 ### 使用位置
@@ -68,6 +69,7 @@ dsh plugin --profile web add /path/to/dsh-model-guard
     modelOrder: []          # 模型显示顺序（"provider/model" 列表）
     providerSort: natural   # natural | name
     modelSort: natural      # natural | name
+    collapsePickerGroups: true   # 对话模型菜单是否默认收起服务商分组
 ```
 
 这些字段都是 `volatile()`，改动即时生效。
@@ -80,6 +82,10 @@ dsh plugin --profile web add /path/to/dsh-model-guard
 选这两个方法是因为 GUI 目录（`buildModelCatalog`）与提交校验（`modelAvailable` → `selectModel` / `requireModel`）
 都只经它们取目录——过滤一处即可同时挡住「显示」与「选择/提交」，重排一处即可决定选择器顺序。
 核心路由不复用该目录，所以本插件是**纯减法 + 重排**：不新增模型、不改路由，`resolveCallConfig()` / `stream()` 仍走原始实例。
+
+对话输入框的模型菜单（`conversation.input.model`）由官方 `dsh-client-ui-model-selection` 渲染，组件未导出且安装包只读，因此「默认收起」走**纯 DOM 增强**：
+官方 `MenuGroup` 的输出带稳定语义钩子（`section[data-menu-group]`、`[data-menu-group-heading]`、直接子级 `button[role="menuitemradio"]`），
+增强器只在这些元素上切换属性，收起效果由 CSS 完成，不插入任何节点，也不依赖 hash 过的 class 名。
 
 ### 已知限制
 
@@ -116,6 +122,7 @@ This open-source project is linked to and endorses the [LINUX DO](https://linux.
   - Manual order: every provider and every model has "move to top / move up / move down".
   - Automatic order: optionally sort items you have not moved manually "by name".
   - The rule is always **explicit order > fallback strategy > original order**, so newly added models land at the end automatically — no need to rewrite the config when models come and go.
+- **Chat model menu starts collapsed**: in the composer's model menu, provider groups are collapsed by default — click a provider name to expand it; searching or using the keyboard expands everything.
 - All settings take effect **immediately**, with no DSH restart.
 
 ### Where to find it
@@ -165,6 +172,7 @@ Every field is editable in the settings page, or directly in the profile's `cord
     modelOrder: []          # model display order (list of "provider/model")
     providerSort: natural   # natural | name
     modelSort: natural      # natural | name
+    collapsePickerGroups: true   # collapse provider groups in the chat model menu
 ```
 
 All of these fields are `volatile()`, so changes apply immediately.
@@ -180,6 +188,11 @@ These two methods are the interception points because both the GUI catalog (`bui
 "display" and "select/submit", and reordering in one place decides the picker's order. Core routing does not reuse that catalog,
 so this plugin is a **pure subtraction + reordering**: it adds no models, changes no routes, and `resolveCallConfig()` / `stream()`
 still go through the original instance.
+
+The composer's model menu (`conversation.input.model`) is rendered by the official `dsh-client-ui-model-selection`, whose component is not
+exported and whose package is read-only, so "collapsed by default" is implemented as a **pure DOM enhancement**: the official `MenuGroup`
+output carries stable semantic hooks (`section[data-menu-group]`, `[data-menu-group-heading]`, direct-child `button[role="menuitemradio"]`),
+and the enhancer only toggles attributes on those elements — collapsing is done in CSS, no nodes are inserted and no hashed class names are used.
 
 ### Known limitations
 
