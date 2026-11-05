@@ -23,7 +23,7 @@ DSH（DeepSeek Harness）插件：**禁用模型 / 服务商**，并**自定义�
 - **对话模型菜单默认收起**：输入框的模型菜单里，服务商分组默认收起，点击服务商名称展开；搜索或键盘操作会自动展开。
 - **优先模型（★）**：把模型标记为优先后，它始终排在其服务商的最前面，不受「置顶 / 上移 / 下移」影响；多个优先模型按标记顺序排列。
 - **可用性测试**：设置页每行有「测试」、工具栏有「测试全部」，向模型发一条极小的 ping 请求，显示 **可用 / 不可用 + 延迟(ms)**；失败时鼠标悬停可看具体原因（如鉴权失败、限流、模型不存在）。结果存在 localStorage（键 `model-guard:probe-results:v1`，保留 7 天），刷新页面、开新标签页都还在，不必为了看一眼再测一次；每行悬停可看「测得于 HH:MM」。测试会消耗个位数 token。
-- **选择器里直接看结果**：对话输入框的模型菜单不提供测试按钮，只把设置页测出来的可用性与延迟显示在模型名右侧。
+- **选择器里直接看结果**：对话输入框的模型菜单不提供测试按钮，只把设置页测出来的可用性、延迟与**测试时间**显示在模型名右侧（如 `可用 · 128 ms · 18:26`，悬停看完整原因）。
 - **分组级测试与并发/超时**：每个服务商的标题右侧有「测试本组」，一次测完该服务商全部模型，并在标题上显示「可用/已测」小计；排序栏可调**探测并发（1–8）**与**探测超时（5/10/20/30 s，默认 10 s）**。
 - **设置默认模型**：设置页顶部「默认模型」下拉按服务商分组列出可选模型，点「设为默认」即写入 profile 的 `agent-default-model` 条目——新会话默认用它，重启后仍生效（走 Host 的 `agentDefaultModel.saveSelection()`，不是另存一份影子配置）。
 - **菜单视觉重排**：分组标题带箭头与分组分割线，模型行与标题文字左缘对齐；选中项用左侧强调条 + 品牌色底标出；行内与分组标题重复的「服务商 · 」前缀拆分后隐去，只留模型名。纯 CSS + DOM 增强，不改官方组件。
@@ -167,7 +167,7 @@ This open-source project is linked to and endorses the [LINUX DO](https://linux.
 - **Chat model menu starts collapsed**: in the composer's model menu, provider groups are collapsed by default — click a provider name to expand it; searching or using the keyboard expands everything.
 - **Priority models (★)**: mark a model as priority and it always sorts first inside its provider, regardless of move-to-top/up/down; multiple priority models keep the order you marked them.
 - **Availability probe**: each row has **Test** and the toolbar has **Test all**. A probe sends one tiny ping to the model and reports **available / unavailable plus latency (ms)**; hover a failure to see the reason (auth, rate limit, unknown model). Results persist in localStorage (key `model-guard:probe-results:v1`, kept for 7 days), so a refresh or a new tab still shows them — no need to re-probe just to look. Hover a row to see "tested at HH:MM". A probe costs a handful of tokens.
-- **Results inside the picker**: the composer's model menu has no test button; it only shows the availability and latency measured on the settings page, next to each model name.
+- **Results inside the picker**: the composer's model menu has no test button; it only shows the availability, latency and **test time** measured on the settings page, next to each model name (e.g. `available · 128 ms · 18:26`; hover for the full reason).
 - **Per-provider testing plus tunable concurrency/timeout**: each provider header has **Test group** (probes every model of that provider and shows an `ok/tested` tally next to the title); the sort bar exposes **probe concurrency (1–8)** and **probe timeout (5/10/20/30 s, default 10 s)**.
 - **Default model**: the **Default model** dropdown at the top of the page groups models by provider; **Set as default** writes the profile's `agent-default-model` entry through the Host's `agentDefaultModel.saveSelection()`, so new sessions use it and it survives restarts — no shadow copy in this plugin.
 - **Picker visual polish**: group headings carry a chevron and group dividers, model rows align with the heading text, and the selected row is marked with a left accent bar plus a brand tint. The "Provider · " prefix that duplicates the group heading is split out and hidden, leaving just the model name. Pure CSS + DOM enhancement — the upstream component is untouched.
