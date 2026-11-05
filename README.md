@@ -21,6 +21,7 @@ DSH（DeepSeek Harness）插件：**禁用模型 / 服务商**，并**自定义�
   - 自动顺序：可选「按名称」排列未被手工调整过的项。
   - 规则恒为 **显式顺序 > 回退策略 > 原顺序**，未列出的新模型自动排在后面，模型增减无需重写配置。
 - **对话模型菜单默认收起**：输入框的模型菜单里，服务商分组默认收起，点击服务商名称展开；搜索或键盘操作会自动展开。
+- **菜单视觉重排**：分组标题带箭头与分组分割线，模型行与标题文字左缘对齐；选中项用左侧强调条 + 品牌色底标出；行内与分组标题重复的「服务商 · 」前缀拆分后隐去，只留模型名。纯 CSS + DOM 增强，不改官方组件。
 - 全部设置改完**即时生效**，不需要重启 DSH。
 
 ### 使用位置
@@ -123,6 +124,7 @@ This open-source project is linked to and endorses the [LINUX DO](https://linux.
   - Automatic order: optionally sort items you have not moved manually "by name".
   - The rule is always **explicit order > fallback strategy > original order**, so newly added models land at the end automatically — no need to rewrite the config when models come and go.
 - **Chat model menu starts collapsed**: in the composer's model menu, provider groups are collapsed by default — click a provider name to expand it; searching or using the keyboard expands everything.
+- **Picker visual polish**: group headings carry a chevron and group dividers, model rows align with the heading text, and the selected row is marked with a left accent bar plus a brand tint. The "Provider · " prefix that duplicates the group heading is split out and hidden, leaving just the model name. Pure CSS + DOM enhancement — the upstream component is untouched.
 - All settings take effect **immediately**, with no DSH restart.
 
 ### Where to find it
