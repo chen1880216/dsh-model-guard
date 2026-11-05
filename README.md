@@ -24,6 +24,8 @@ DSH（DeepSeek Harness）插件：**禁用模型 / 服务商**，并**自定义�
 - **优先模型（★）**：把模型标记为优先后，它始终排在其服务商的最前面，不受「置顶 / 上移 / 下移」影响；多个优先模型按标记顺序排列。
 - **可用性测试**：设置页每行有「测试」、工具栏有「测试全部」，向模型发一条极小的 ping 请求，显示 **可用 / 不可用 + 延迟(ms)**；失败时鼠标悬停可看具体原因（如鉴权失败、限流、模型不存在）。结果只活在当前页面，刷新即清空。测试会消耗个位数 token。
 - **选择器里直接看结果**：对话输入框的模型菜单不提供测试按钮，只把设置页测出来的可用性与延迟显示在模型名右侧。
+- **分组级测试与并发/超时**：每个服务商的标题右侧有「测试本组」，一次测完该服务商全部模型，并在标题上显示「可用/已测」小计；排序栏可调**探测并发（1–8）**与**探测超时（5/10/20/30 s，默认 10 s）**。
+- **设置默认模型**：设置页顶部「默认模型」下拉按服务商分组列出可选模型，点「设为默认」即写入 profile 的 `agent-default-model` 条目——新会话默认用它，重启后仍生效（走 Host 的 `agentDefaultModel.saveSelection()`，不是另存一份影子配置）。
 - **菜单视觉重排**：分组标题带箭头与分组分割线，模型行与标题文字左缘对齐；选中项用左侧强调条 + 品牌色底标出；行内与分组标题重复的「服务商 · 」前缀拆分后隐去，只留模型名。纯 CSS + DOM 增强，不改官方组件。
 - 全部设置改完**即时生效**，不需要重启 DSH。
 
@@ -72,6 +74,8 @@ dsh plugin --profile web add /path/to/dsh-model-guard
     providerOrder: []       # 服务商显示顺序（id 列表）
     modelOrder: []          # 模型显示顺序（"provider/model" 列表）
     priorityModels: []      # 优先模型（"provider/model" 列表），顺序即优先级
+    probeConcurrency: 3     # 探测并发（1–8）
+    probeTimeoutMs: 10000   # 单个模型的探测超时（毫秒，1000–60000）
     providerSort: natural   # natural | name
     modelSort: natural      # natural | name
     collapsePickerGroups: true   # 对话模型菜单是否默认收起服务商分组
@@ -103,13 +107,27 @@ curl -X POST http://127.0.0.1:3080/api/model-guard/probe \
 # → {"results":[{"provider":"magpie","model":"group/wb-v41","ok":true,"latencyMs":1425}],"timeoutMs":20000}
 ```
 
-- 请求体 `{ items: [{provider, model}], timeoutMs? }`；单次最多 `200` 个模型、默认超时 20 s、Host 侧并发 3。
+- 请求体 `{ items: [{provider, model}], concurrency?, timeoutMs? }`；单次最多 200 个模型；默认超时 **10 s**、默认并发 **3**（都可在设置页改，请求体也会被夹到 1000–60000 ms / 1–8）。
 - 只接受同源请求（校验 `Origin` 的 host 与 `Host` 一致），跨站返回 403；非 POST 返回 405。
 - 探测链路与真实对话一致：`llm.prepareCall()` → `call.stream()`，所以凭据、路由、重试策略都是生产路径；
   失败时返回 `LlmFailure.code`（如 `UNKNOWN_MODEL`、`AUTH`、`RATE_LIMIT`）与 `message`。
 
 为什么要单开 HTTP 路由而不是新增 Remote 命名空间：Remote 的命名空间与参数描述由 Typert 代码生成器产出，
 第三方插件无法在运行时注册；`webServer.register()` 是公开的精确路由入口，且精确路由优先命中，不必改动 `/api` 桥。
+
+### 默认模型端点
+
+```bash
+curl -s http://127.0.0.1:3080/api/model-guard/default           # → {"provider":"magpie","model":"group/wb-v41"}
+curl -s -X POST http://127.0.0.1:3080/api/model-guard/default \
+  -H 'content-type: application/json' \
+  -d '{"provider":"magpie","model":"group/wb-v41"}'             # → {"ok":true,...}
+```
+
+- GET 读 Host 的 `agentDefaultModel.currentSelection()`；POST 走 `saveSelection()` → `configEditor` → 写回 profile 的
+  `agent-default-model` 条目，因此**持久化**，重启后仍生效。
+- 同一个模型重复提交会保留原有 `reasoningEffort`；换模型则不保留（可能对该模型不合法）。
+- 缺少 `agentDefaultModel` 或 `configEditor` 时返回 501，前端据此显示「当前环境不支持」——不会出现「提示成功但没写」。
 
 ### 已知限制
 
@@ -120,7 +138,7 @@ curl -X POST http://127.0.0.1:3080/api/model-guard/probe \
 - **只收窄人的选择面，不阻断内部调用**：已被 subagent、compaction 等组件显式指定的模型仍能运行。
 - 依赖 `internal/get` 这个带 `internal` 前缀的 waterfall，它不是公开契约。DSH 大版本升级后若菜单不再隐藏/顺序不再跟随设置，
   说明该事件签名变了。
-- 排序是纯显示层重排，**不影响默认模型**（默认模型由 profile 的 `agent-default-model` 行决定）。
+- 排序是纯显示层重排；**默认模型由 profile 的 `agent-default-model` 行决定**，设置页的「默认模型」只是调用该服务的 `saveSelection()`，两者不共用同一份存储。
 
 ### 许可
 
@@ -150,6 +168,8 @@ This open-source project is linked to and endorses the [LINUX DO](https://linux.
 - **Priority models (★)**: mark a model as priority and it always sorts first inside its provider, regardless of move-to-top/up/down; multiple priority models keep the order you marked them.
 - **Availability probe**: each row has **Test** and the toolbar has **Test all**. A probe sends one tiny ping to the model and reports **available / unavailable plus latency (ms)**; hover a failure to see the reason (auth, rate limit, unknown model). Results live only in the current page session. A probe costs a handful of tokens.
 - **Results inside the picker**: the composer's model menu has no test button; it only shows the availability and latency measured on the settings page, next to each model name.
+- **Per-provider testing plus tunable concurrency/timeout**: each provider header has **Test group** (probes every model of that provider and shows an `ok/tested` tally next to the title); the sort bar exposes **probe concurrency (1–8)** and **probe timeout (5/10/20/30 s, default 10 s)**.
+- **Default model**: the **Default model** dropdown at the top of the page groups models by provider; **Set as default** writes the profile's `agent-default-model` entry through the Host's `agentDefaultModel.saveSelection()`, so new sessions use it and it survives restarts — no shadow copy in this plugin.
 - **Picker visual polish**: group headings carry a chevron and group dividers, model rows align with the heading text, and the selected row is marked with a left accent bar plus a brand tint. The "Provider · " prefix that duplicates the group heading is split out and hidden, leaving just the model name. Pure CSS + DOM enhancement — the upstream component is untouched.
 - All settings take effect **immediately**, with no DSH restart.
 
