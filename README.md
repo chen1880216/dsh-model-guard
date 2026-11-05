@@ -21,6 +21,9 @@ DSH（DeepSeek Harness）插件：**禁用模型 / 服务商**，并**自定义�
   - 自动顺序：可选「按名称」排列未被手工调整过的项。
   - 规则恒为 **显式顺序 > 回退策略 > 原顺序**，未列出的新模型自动排在后面，模型增减无需重写配置。
 - **对话模型菜单默认收起**：输入框的模型菜单里，服务商分组默认收起，点击服务商名称展开；搜索或键盘操作会自动展开。
+- **优先模型（★）**：把模型标记为优先后，它始终排在其服务商的最前面，不受「置顶 / 上移 / 下移」影响；多个优先模型按标记顺序排列。
+- **可用性测试**：设置页每行有「测试」、工具栏有「测试全部」，向模型发一条极小的 ping 请求，显示 **可用 / 不可用 + 延迟(ms)**；失败时鼠标悬停可看具体原因（如鉴权失败、限流、模型不存在）。结果只活在当前页面，刷新即清空。测试会消耗个位数 token。
+- **选择器里直接看结果**：对话输入框的模型菜单不提供测试按钮，只把设置页测出来的可用性与延迟显示在模型名右侧。
 - **菜单视觉重排**：分组标题带箭头与分组分割线，模型行与标题文字左缘对齐；选中项用左侧强调条 + 品牌色底标出；行内与分组标题重复的「服务商 · 」前缀拆分后隐去，只留模型名。纯 CSS + DOM 增强，不改官方组件。
 - 全部设置改完**即时生效**，不需要重启 DSH。
 
@@ -68,6 +71,7 @@ dsh plugin --profile web add /path/to/dsh-model-guard
     disabledProviders: []   # provider id，禁用整个服务商
     providerOrder: []       # 服务商显示顺序（id 列表）
     modelOrder: []          # 模型显示顺序（"provider/model" 列表）
+    priorityModels: []      # 优先模型（"provider/model" 列表），顺序即优先级
     providerSort: natural   # natural | name
     modelSort: natural      # natural | name
     collapsePickerGroups: true   # 对话模型菜单是否默认收起服务商分组
@@ -87,6 +91,25 @@ dsh plugin --profile web add /path/to/dsh-model-guard
 对话输入框的模型菜单（`conversation.input.model`）由官方 `dsh-client-ui-model-selection` 渲染，组件未导出且安装包只读，因此「默认收起」走**纯 DOM 增强**：
 官方 `MenuGroup` 的输出带稳定语义钩子（`section[data-menu-group]`、`[data-menu-group-heading]`、直接子级 `button[role="menuitemradio"]`），
 增强器只在这些元素上切换属性，收起效果由 CSS 完成，不插入任何节点，也不依赖 hash 过的 class 名。
+
+### 探测端点
+
+可用性测试走同源 HTTP 端点 `POST /api/model-guard/probe`（由 Host 半边在 `ctx.webServer` 上注册的精确路由，优先于 `/api` 前缀桥）：
+
+```bash
+curl -X POST http://127.0.0.1:3080/api/model-guard/probe \
+  -H 'content-type: application/json' \
+  -d '{"items":[{"provider":"magpie","model":"group/wb-v41"}]}'
+# → {"results":[{"provider":"magpie","model":"group/wb-v41","ok":true,"latencyMs":1425}],"timeoutMs":20000}
+```
+
+- 请求体 `{ items: [{provider, model}], timeoutMs? }`；单次最多 `200` 个模型、默认超时 20 s、Host 侧并发 3。
+- 只接受同源请求（校验 `Origin` 的 host 与 `Host` 一致），跨站返回 403；非 POST 返回 405。
+- 探测链路与真实对话一致：`llm.prepareCall()` → `call.stream()`，所以凭据、路由、重试策略都是生产路径；
+  失败时返回 `LlmFailure.code`（如 `UNKNOWN_MODEL`、`AUTH`、`RATE_LIMIT`）与 `message`。
+
+为什么要单开 HTTP 路由而不是新增 Remote 命名空间：Remote 的命名空间与参数描述由 Typert 代码生成器产出，
+第三方插件无法在运行时注册；`webServer.register()` 是公开的精确路由入口，且精确路由优先命中，不必改动 `/api` 桥。
 
 ### 已知限制
 
@@ -124,6 +147,9 @@ This open-source project is linked to and endorses the [LINUX DO](https://linux.
   - Automatic order: optionally sort items you have not moved manually "by name".
   - The rule is always **explicit order > fallback strategy > original order**, so newly added models land at the end automatically — no need to rewrite the config when models come and go.
 - **Chat model menu starts collapsed**: in the composer's model menu, provider groups are collapsed by default — click a provider name to expand it; searching or using the keyboard expands everything.
+- **Priority models (★)**: mark a model as priority and it always sorts first inside its provider, regardless of move-to-top/up/down; multiple priority models keep the order you marked them.
+- **Availability probe**: each row has **Test** and the toolbar has **Test all**. A probe sends one tiny ping to the model and reports **available / unavailable plus latency (ms)**; hover a failure to see the reason (auth, rate limit, unknown model). Results live only in the current page session. A probe costs a handful of tokens.
+- **Results inside the picker**: the composer's model menu has no test button; it only shows the availability and latency measured on the settings page, next to each model name.
 - **Picker visual polish**: group headings carry a chevron and group dividers, model rows align with the heading text, and the selected row is marked with a left accent bar plus a brand tint. The "Provider · " prefix that duplicates the group heading is split out and hidden, leaving just the model name. Pure CSS + DOM enhancement — the upstream component is untouched.
 - All settings take effect **immediately**, with no DSH restart.
 
