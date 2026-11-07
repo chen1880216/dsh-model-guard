@@ -31,18 +31,91 @@ DSH（DeepSeek Harness）插件：**禁用模型 / 服务商**，并**自定义�
 
 ### 使用位置
 
-安装后，在 DSH 的 **设置 → 模型禁用与排序** 中使用。
+安装后，在 DSH 的 **设置 → 模型禁用与排序** 中使用。`dsh web` 与桌面版位置相同；
+若某个入口里完全看不到这一页，先按下面「安装 → 先选对 profile」确认插件装进了它实际使用的 profile。
 
 ### 安装
 
 要求 DSH `0.2.x`（`@deepseek-ai/dsh`），Node `>=22`。
 
-```bash
-# 从本仓库目录安装到 web profile
-dsh plugin --profile web add /path/to/dsh-model-guard
+#### 先选对 profile
+
+插件只装在哪个 profile，就只对哪个 profile 生效。按你启动 DSH 的方式选目标：
+
+| 启动方式 | 目标 profile | 安装命令 |
+| --- | --- | --- |
+| `dsh web`（浏览器打开 `127.0.0.1:3080`） | `web` | `dsh plugin --profile web add <路径>` |
+| **桌面版（Electron）** | **`desktop`** | 见下「桌面版请装到 `desktop`」 |
+| 自建 profile（如 `tui`） | 该 profile 名 | `dsh plugin --profile <名字> add <路径>` |
+
+> ⚠️ **装到 `web` 只对 `dsh web` 生效。** 桌面版里根本不会出现「设置 → 模型禁用与排序」——
+> 命令执行成功、HMR 也正常，唯独桌面版毫无反应，这时先查 profile 是否装错，而不是查插件。
+
+#### 桌面版请装到 `desktop`
+
+桌面版用的是保留 profile `desktop`，目录 `$DSH_HOME/profiles/desktop`（未设 `DSH_HOME` 时为 `~/.dsh/profiles/desktop`）。
+该 profile 由 Electron 应用独占管理，**独立 `dsh` 命令会直接拒绝**：
+
+```text
+error: profile "desktop" is managed exclusively by the Electron application
 ```
 
-`dsh plugin add` 会把包写进 profile 的 `dependencies` 与 `dsh.profile.bundles`，随后 HMR 自动组合。
+正确顺序：
+
+1. 先打开桌面版一次，让它初始化 `profiles/desktop`（未初始化时命令会提示 `Open DeepSeek Harness Desktop once to initialize its profile, then fully quit it…`）。
+2. **完全退出**桌面版（不是关窗口、也不是最小化到托盘），避免 profile 的 `package.json` 被占用。
+3. 用桌面版安装目录里自带的那个 `dsh` 启动器执行——只有它带 `manageDesktopProfile` 权限，能管理 `desktop` profile
+   （其具体路径随安装包而定，本仓库未逐一验证；若它不接受 `plugin` 子命令，直接用下面的手工做法）：
+
+```bash
+dsh plugin --profile desktop add /path/to/dsh-model-guard
+```
+
+4. 重新打开桌面版，进 **设置 → 模型禁用与排序** 确认。
+
+拿不到桌面版启动器时，等价的手工做法是直接改 profile 清单，改完在该目录跑一次 `pnpm install`，再重启应用：
+
+```jsonc
+// $DSH_HOME/profiles/desktop/package.json
+{
+  "dependencies": { "@local/dsh-model-guard": "link:/path/to/dsh-model-guard" },
+  "dsh": { "profile": { "bundles": [ /* 保留原有项 */, "@local/dsh-model-guard" ] } }
+}
+```
+
+两处都要写：`dependencies` 决定能否解析到包，`bundles` 决定它是否参与组合。
+
+#### 自检：装对了吗
+
+Host 半边注册成功时，探测路由会对**空 items** 返回 `400`：
+
+```bash
+curl -s -X POST http://127.0.0.1:3080/api/model-guard/probe \
+  -H 'content-type: application/json' \
+  -d '{"items":[]}'
+# → {"error":"no-items"}
+```
+
+- `400 {"error":"no-items"}`：**Host 半边已注册**，路由命中。这是空 items 的预期拒绝，不是故障。
+- `404` / 返回 HTML / 连接被拒：该 profile 没装或没组合上——最常见的原因就是装进了别的 profile。
+- `405`：用了 GET；`403 {"error":"cross-origin"}`：`Origin` 与 `Host` 不一致。
+- 桌面版的监听端口由应用自己决定（本仓库未验证具体端口，不一定是 `3080`）。此时以「设置页里出现模型禁用与排序」和日志行
+  `model-guard: probe endpoint listening on /api/model-guard/probe` 为准。
+
+#### `link:` 安装与 peerDependencies WARN
+
+用本地路径安装时 pnpm 会写成 `link:`，并打印：
+
+```text
+WARN  Issues with peer dependencies found
+└─┬ @local/dsh-model-guard
+  ├── ✕ unmet peer @deepseek-ai/cordis
+  └── ✕ unmet peer @deepseek-ai/schemastery
+```
+
+**这是正常现象，可以忽略。** profile 的 `pnpm-workspace.yaml` 默认 `autoInstallPeers: false`，这两个包由 DSH
+安装目录在运行时提供；插件声明它们的唯一目的是让 `ResolutionRouter.routeLinked()` 把裸包名走 interception 路由。
+判定安装成功的标准是 `package.json` 的 `dependencies` 与 `dsh.profile.bundles` 两处都出现了本包，不是这条 WARN 是否消失。
 
 若用 `link:` 方式安装，profile 的 `package.json` 需要同时出现在两处：
 
@@ -52,6 +125,8 @@ dsh plugin --profile web add /path/to/dsh-model-guard
   "dsh": { "profile": { "bundles": [ /* … */, "@local/dsh-model-guard" ] } }
 }
 ```
+
+`dsh plugin add` 会把包写进 profile 的 `dependencies` 与 `dsh.profile.bundles`，随后 HMR 自动组合。
 
 > **`link:` 安装必须声明 `peerDependencies`**（本包已声明 `@deepseek-ai/cordis`、`@deepseek-ai/schemastery`）。
 > DSH 的 `ResolutionRouter.routeLinked()` 只对「在祖先 `node_modules` 里被声明为 peer」的裸包名走 interception 路由，
@@ -175,20 +250,100 @@ This open-source project is linked to and endorses the [LINUX DO](https://linux.
 
 ### Where to find it
 
-After installation, open **Settings → Models & ordering** in DSH.
+After installation, open **Settings → Models & ordering** in DSH. It lives in the same place in `dsh web` and in Desktop;
+if one of them shows no such page, check "Installation → Pick the right profile first" — the plugin is probably installed
+into the other profile.
 
 ### Installation
 
 Requires DSH `0.2.x` (`@deepseek-ai/dsh`) and Node `>=22`.
 
-```bash
-# Install from this repository's directory into the web profile
-dsh plugin --profile web add /path/to/dsh-model-guard
+#### Pick the right profile first
+
+The plugin only affects the profile it is installed into. Choose by how you start DSH:
+
+| How you start DSH | Target profile | Command |
+| --- | --- | --- |
+| `dsh web` (browser at `127.0.0.1:3080`) | `web` | `dsh plugin --profile web add <path>` |
+| **Desktop (Electron)** | **`desktop`** | see "Desktop uses the `desktop` profile" below |
+| Your own profile (e.g. `tui`) | that profile's name | `dsh plugin --profile <name> add <path>` |
+
+> ⚠️ **Installing into `web` only affects `dsh web`.** The Desktop app will show no **Settings → Models & ordering** at
+> all: the command succeeded and HMR is fine, yet Desktop looks unaffected — check the profile before you debug the plugin.
+
+#### Desktop uses the `desktop` profile
+
+Desktop runs the reserved profile `desktop`, at `$DSH_HOME/profiles/desktop` (`~/.dsh/profiles/desktop` when `DSH_HOME`
+is unset). That profile is owned exclusively by the Electron application, and a standalone `dsh` binary refuses it:
+
+```text
+error: profile "desktop" is managed exclusively by the Electron application
 ```
 
-`dsh plugin add` writes the package into the profile's `dependencies` and `dsh.profile.bundles`, after which HMR composes it automatically.
+The correct order:
 
-If you install it as a `link:` dependency, the profile's `package.json` must list it in both places:
+1. Open Desktop once so it initializes `profiles/desktop` (otherwise the command reports
+   `Open DeepSeek Harness Desktop once to initialize its profile, then fully quit it…`).
+2. **Quit Desktop completely** (closing the window or minimizing to tray is not enough) so the profile's `package.json` is free.
+3. Run the `dsh` launcher that ships inside the Desktop installation — only it carries the `manageDesktopProfile`
+   permission needed to manage the `desktop` profile (its exact path depends on the installer and is not verified here;
+   if it does not accept the `plugin` subcommand, use the manual route below):
+
+```bash
+dsh plugin --profile desktop add /path/to/dsh-model-guard
+```
+
+4. Reopen Desktop and check **Settings → Models & ordering**.
+
+If that launcher is not reachable, the equivalent manual route is to edit the profile manifest, run `pnpm install` in
+that directory, and restart the app:
+
+```jsonc
+// $DSH_HOME/profiles/desktop/package.json
+{
+  "dependencies": { "@local/dsh-model-guard": "link:/path/to/dsh-model-guard" },
+  "dsh": { "profile": { "bundles": [ /* keep existing entries */, "@local/dsh-model-guard" ] } }
+}
+```
+
+Both entries matter: `dependencies` makes the package resolvable, `bundles` makes it part of composition.
+
+#### Self-check: did it land in the right profile?
+
+Once the Host half is registered, the probe route answers **empty items** with `400`:
+
+```bash
+curl -s -X POST http://127.0.0.1:3080/api/model-guard/probe \
+  -H 'content-type: application/json' \
+  -d '{"items":[]}'
+# → {"error":"no-items"}
+```
+
+- `400 {"error":"no-items"}`: the **Host half is registered** and the route matched. That is the expected rejection of an
+  empty request, not a failure.
+- `404` / HTML / connection refused: this profile has not installed or composed the plugin — installing into a different
+  profile is the usual cause.
+- `405`: you used GET; `403 {"error":"cross-origin"}`: `Origin` and `Host` disagree.
+- Desktop picks its own listening port (not verified in this repository; it need not be `3080`). In that case go by "the settings page shows Models &
+  ordering" and the log line `model-guard: probe endpoint listening on /api/model-guard/probe`.
+
+#### `link:` installs and the peerDependencies WARN
+
+A local-path install becomes a `link:` dependency and pnpm prints:
+
+```text
+WARN  Issues with peer dependencies found
+└─┬ @local/dsh-model-guard
+  ├── ✕ unmet peer @deepseek-ai/cordis
+  └── ✕ unmet peer @deepseek-ai/schemastery
+```
+
+**This is normal and safe to ignore.** The profile's `pnpm-workspace.yaml` sets `autoInstallPeers: false`, and both packages
+are supplied at runtime by the DSH installation; declaring them only makes `ResolutionRouter.routeLinked()` route the bare
+names through interception. Judge success by seeing the package in **both** `dependencies` and `dsh.profile.bundles` of the
+profile's `package.json`, not by whether this WARN disappears.
+
+For a `link:` install, the profile's `package.json` must list the package in both places:
 
 ```jsonc
 {
@@ -196,6 +351,8 @@ If you install it as a `link:` dependency, the profile's `package.json` must lis
   "dsh": { "profile": { "bundles": [ /* … */, "@local/dsh-model-guard" ] } }
 }
 ```
+
+`dsh plugin add` writes the package into the profile's `dependencies` and `dsh.profile.bundles`, after which HMR composes it automatically.
 
 > **A `link:` install must declare `peerDependencies`** (this package declares `@deepseek-ai/cordis` and `@deepseek-ai/schemastery`).
 > DSH's `ResolutionRouter.routeLinked()` only routes bare package names through interception when the ancestor `node_modules`

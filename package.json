@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-model-guard",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "private": true,
   "description": "DSH（DeepSeek Harness）模型禁用与排序插件：在设置里禁用模型/服务商，并自定义对话模型选择器里服务商与模型的显示顺序。",
   "type": "module",
