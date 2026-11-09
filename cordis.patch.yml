@@ -20,3 +20,22 @@
         providerSort: natural
         modelSort: natural
         collapsePickerGroups: true
+
+# 侧边栏「搜索全部对话」：打开会话全文索引。
+#
+# 上游 `@deepseek-ai/dsh-base` / `@deepseek-ai/dsh-web-app` 把 session-query-sqlite
+# 挂成 `openAt: never`（只保留精确读取/标题/血缘，Web 侧边栏搜索只能匹配标题与
+# 工作区名）。本 bundle 排在 dsh-web-app 之后，用这条 id 覆盖把索引打开：
+#
+#   openAt: first-search  首次搜索时构建/增量同步 SQLite 全文索引（不在启动期打开，
+#                         Node 启动保持安静）；索引就绪后侧边栏搜索框命中消息正文，
+#                         返回会话标题 + 正文片段。
+#   path                 持久化派生索引，避免每次进程重启重建；目录随 DSH_HOME。
+#   journalMode: wal      索引库是读多写少的派生数据，WAL 降低读写互斥。
+#
+# 关掉本功能：把 openAt 改回 never（或删掉这条 patch 条目）。
+- id: session-query-sqlite
+  config:
+    path: !!js dshHomePath('cache/session-search.sqlite')
+    openAt: first-search
+    journalMode: wal

@@ -12,6 +12,8 @@ DSH（DeepSeek Harness）插件：**禁用模型 / 服务商**，并**自定义�
 
 被禁用的模型或服务商不会出现在对话的模型选择器里，也无法被选中或提交；排序决定选择器里服务商的先后，以及每个服务商内部模型的先后。
 
+![模型禁用与排序设置页：搜索与计数、服务商/模型排序策略、探测并发与超时、默认模型、按服务商分组的模型列表（优先 ★、可用性徽标、测试按钮、禁用开关）](docs/screenshots/settings-zh.png)
+
 ### 功能
 
 - **禁用单个模型**：勾掉后它从模型选择器消失，且 Host 侧拒绝选中/提交该模型。
@@ -27,6 +29,7 @@ DSH（DeepSeek Harness）插件：**禁用模型 / 服务商**，并**自定义�
 - **分组级测试与并发/超时**：每个服务商的标题右侧有「测试本组」，一次测完该服务商全部模型，并在标题上显示「可用/已测」小计；排序栏可调**探测并发（1–8）**与**探测超时（5/10/20/30 s，默认 10 s）**。
 - **设置默认模型**：设置页顶部「默认模型」下拉按服务商分组列出可选模型，点「设为默认」即写入 profile 的 `agent-default-model` 条目——新会话默认用它，重启后仍生效（走 Host 的 `agentDefaultModel.saveSelection()`，不是另存一份影子配置）。
 - **菜单视觉重排**：分组标题带箭头与分组分割线，模型行与标题文字左缘对齐；选中项用左侧强调条 + 品牌色底标出；行内与分组标题重复的「服务商 · 」前缀拆分后隐去，只留模型名。纯 CSS + DOM 增强，不改官方组件。
+- **侧边栏全文搜索**：侧边栏放大镜（或 `Ctrl/Cmd+K`）现在能搜**全部会话的正文**，命中的用户/助手消息以片段形式列出，不再只是标题与工作区名。见下方「侧边栏全文搜索」。
 - 全部设置改完**即时生效**，不需要重启 DSH。
 
 ### 使用位置
@@ -204,6 +207,32 @@ curl -s -X POST http://127.0.0.1:3080/api/model-guard/default \
 - 同一个模型重复提交会保留原有 `reasoningEffort`；换模型则不保留（可能对该模型不合法）。
 - 缺少 `agentDefaultModel` 或 `configEditor` 时返回 501，前端据此显示「当前环境不支持」——不会出现「提示成功但没写」。
 
+### 侧边栏全文搜索
+
+侧边栏顶部的放大镜（快捷键 `Ctrl/Cmd+K`）本来就有跨会话搜索，但默认只匹配**会话标题与工作区名**。
+原因是官方把会话索引挂成了 `openAt: never`（`dsh-base` / `dsh-web-app` 的 `cordis.patch.yml` 里
+`session-query-sqlite` 的 `path: ':memory:'`），Host 的 `sessionQuery` 服务因此直接抛
+`session search is disabled`，前端拿不到正文结果。
+
+本插件在**自己的 bundle patch 层**里覆盖同一个条目（bundle 排在官方层之后，后应用的 patch 生效），
+把索引开到磁盘上并在首次搜索时建立：
+
+```yaml
+- id: session-query-sqlite
+  config:
+    path: !!js dshHomePath('cache/session-search.sqlite')
+    openAt: first-search
+    journalMode: wal
+```
+
+- 索引文件：`$DSH_HOME/cache/session-search.sqlite`（含 `-shm` / `-wal`），权限 `0600`，可随时删除重建。
+- 首次搜索要全量扫描历史会话（几千条消息约几十秒），期间界面上可能提示
+  `session-search persistence observation did not stabilize after one retry` —— 这是建索引时
+  活跃会话仍在写入导致快照不稳定，**再搜一次即可**，不是配置错误。
+- 只索引用户/助手消息（`user/message`、`assistant/message`，且 `surface: current`），不含工具输出与思考内容。
+- 单次结果上限 20 条，命中处按 `snippetChars` 截取片段。
+- 想关掉正文搜索、回到只搜标题：把上面 `openAt` 改回 `never`（或删掉这一条 patch），再删掉索引文件。
+
 ### 已知限制
 
 - **`deepseek-account` 与 `deepseek-official` 的顺序无法调整**：客户端 `orderModelProviders()` 无条件把这两个排在最前，
@@ -229,6 +258,8 @@ A DSH (DeepSeek Harness) plugin that **disables models / providers** and **custo
 
 A disabled model or provider is hidden from the conversation model picker and can neither be selected nor submitted. Ordering decides the sequence of providers in that picker, and of the models inside each provider.
 
+![The settings page (Chinese UI): search and counters, provider/model ordering, probe concurrency and timeout, default model, and per-provider model rows with priority ★, availability badges, test buttons and enable switches](docs/screenshots/settings-zh.png)
+
 This open-source project is linked to and endorses the [LINUX DO](https://linux.do) community.
 
 ### Features
@@ -246,6 +277,7 @@ This open-source project is linked to and endorses the [LINUX DO](https://linux.
 - **Per-provider testing plus tunable concurrency/timeout**: each provider header has **Test group** (probes every model of that provider and shows an `ok/tested` tally next to the title); the sort bar exposes **probe concurrency (1–8)** and **probe timeout (5/10/20/30 s, default 10 s)**.
 - **Default model**: the **Default model** dropdown at the top of the page groups models by provider; **Set as default** writes the profile's `agent-default-model` entry through the Host's `agentDefaultModel.saveSelection()`, so new sessions use it and it survives restarts — no shadow copy in this plugin.
 - **Picker visual polish**: group headings carry a chevron and group dividers, model rows align with the heading text, and the selected row is marked with a left accent bar plus a brand tint. The "Provider · " prefix that duplicates the group heading is split out and hidden, leaving just the model name. Pure CSS + DOM enhancement — the upstream component is untouched.
+- **Sidebar full-text search**: the sidebar magnifier (`Ctrl/Cmd+K`) now searches **message bodies across every session**, listing matching user/assistant messages with snippets instead of only titles and workspace names. See "Sidebar full-text search" below.
 - All settings take effect **immediately**, with no DSH restart.
 
 ### Where to find it
@@ -398,6 +430,32 @@ The composer's model menu (`conversation.input.model`) is rendered by the offici
 exported and whose package is read-only, so "collapsed by default" is implemented as a **pure DOM enhancement**: the official `MenuGroup`
 output carries stable semantic hooks (`section[data-menu-group]`, `[data-menu-group-heading]`, direct-child `button[role="menuitemradio"]`),
 and the enhancer only toggles attributes on those elements — collapsing is done in CSS, no nodes are inserted and no hashed class names are used.
+
+### Sidebar full-text search
+
+The magnifier at the top of the sidebar (`Ctrl/Cmd+K`) already searched across sessions, but by default it only matched
+**session titles and workspace names**. The reason is that upstream wires the session index with `openAt: never`
+(`session-query-sqlite` with `path: ':memory:'` in the `cordis.patch.yml` of `dsh-base` / `dsh-web-app`), so the Host's
+`sessionQuery` service throws `session search is disabled` and the client never gets message content back.
+
+This plugin overrides that same entry in **its own bundle patch layer** (the bundle sorts after the official layers, so the
+later patch wins), putting the index on disk and building it on the first search:
+
+```yaml
+- id: session-query-sqlite
+  config:
+    path: !!js dshHomePath('cache/session-search.sqlite')
+    openAt: first-search
+    journalMode: wal
+```
+
+- Index file: `$DSH_HOME/cache/session-search.sqlite` (plus `-shm` / `-wal`), mode `0600`, safe to delete and rebuild.
+- The first search walks all historical sessions (tens of seconds for a few thousand messages). During that build the UI may report
+  `session-search persistence observation did not stabilize after one retry` — the active session keeps writing, so two
+  persistence snapshots disagree; **search again** and it succeeds. It is not a configuration error.
+- Only user/assistant messages are indexed (`user/message`, `assistant/message`, `surface: current`); tool output and reasoning are not.
+- At most 20 results per query, each with a snippet cut at `snippetChars`.
+- To turn content search off and go back to titles only: set `openAt` back to `never` (or drop the patch entry) and delete the index file.
 
 ### Known limitations
 
