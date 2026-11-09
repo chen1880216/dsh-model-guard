@@ -214,6 +214,8 @@ curl -s -X POST http://127.0.0.1:3080/api/model-guard/default \
 `session-query-sqlite` 的 `path: ':memory:'`），Host 的 `sessionQuery` 服务因此直接抛
 `session search is disabled`，前端拿不到正文结果。
 
+![侧边栏搜索「全部会话的消息正文」：搜索框下方直接列出命中的会话标题与正文片段](docs/screenshots/sidebar-search-zh.png)
+
 本插件在**自己的 bundle patch 层**里覆盖同一个条目（bundle 排在官方层之后，后应用的 patch 生效），
 把索引开到磁盘上并在首次搜索时建立：
 
@@ -437,6 +439,8 @@ The magnifier at the top of the sidebar (`Ctrl/Cmd+K`) already searched across s
 **session titles and workspace names**. The reason is that upstream wires the session index with `openAt: never`
 (`session-query-sqlite` with `path: ':memory:'` in the `cordis.patch.yml` of `dsh-base` / `dsh-web-app`), so the Host's
 `sessionQuery` service throws `session search is disabled` and the client never gets message content back.
+
+![Sidebar search for "message bodies across every session": matching session titles and snippets listed right under the input (Chinese UI)](docs/screenshots/sidebar-search-zh.png)
 
 This plugin overrides that same entry in **its own bundle patch layer** (the bundle sorts after the official layers, so the
 later patch wins), putting the index on disk and building it on the first search:
